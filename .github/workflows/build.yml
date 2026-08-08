@@ -1,17 +1,10 @@
-{
-  "name": "Marcus AI SWING TEST",
-  "on": {
-    "workflow_dispatch": {}
-  },
-  "jobs": {
-    "test": {
-      "runs-on": "ubuntu-latest",
-      "steps": [
-        {
-          "name": "Marcus Test",
-          "run": "echo \"Marcus AI SWING workflow OK\""
-        }
-      ]
-    }
-  }
-}
+name: Marcus Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Marcus OK"
