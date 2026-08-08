@@ -1,0 +1,980 @@
+name: Marcus AI SWING v0.2.4 Fixed Dual Kiwoom Accounts
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2'
+
+      - name: Create Android project
+        run: |
+          mkdir -p app/src/main/java/com/marcus/aiswing
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "MarcusAISwing"
+          include(":app")
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.2.2' apply false
+          }
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.marcus.aiswing'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.marcus.aiswing"
+                  minSdk 26
+                  targetSdk 34
+                  versionCode 6
+                  versionName "0.2.4"
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <application
+                  android:label="Marcus AI SWING"
+                  android:usesCleartextTraffic="false"
+                  android:theme="@style/AppTheme">
+                  <activity
+                      android:name=".MainActivity"
+                      android:screenOrientation="unspecified"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:statusBarColor">#07101F</item>
+                  <item name="android:navigationBarColor">#07101F</item>
+                  <item name="android:colorAccent">#7EA7FF</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/java/com/marcus/aiswing/MainActivity.java <<'JAVA'
+          package com.marcus.aiswing;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.text.Editable;
+          import android.text.InputType;
+          import android.text.TextWatcher;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.widget.*;
+
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          import java.io.*;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.nio.charset.StandardCharsets;
+          import java.util.ArrayList;
+          import java.util.List;
+
+          public class MainActivity extends Activity {
+
+              final int BG=Color.rgb(7,16,31), PANEL=Color.rgb(17,28,48),
+                  PANEL2=Color.rgb(24,38,63), TEXT=Color.rgb(239,244,255),
+                  MUTED=Color.rgb(151,166,195), BLUE=Color.rgb(126,167,255),
+                  GREEN=Color.rgb(103,220,157), RED=Color.rgb(255,116,116),
+                  YELLOW=Color.rgb(255,211,105);
+
+              LinearLayout content, nav;
+              SharedPreferences prefs;
+              final List<Stock> stockList = new ArrayList<>();
+
+              static final String PREFS="marcus_api_settings_v023";
+              static final String KEY_ENV="active_env";
+
+              static final String MOCK="모의투자";
+              static final String REAL="실전투자";
+
+              static final String MOCK_ACCOUNT="mock_account_alias";
+              static final String MOCK_APPKEY="mock_app_key";
+              static final String MOCK_SECRET="mock_app_secret";
+              static final String MOCK_TOKEN="mock_access_token";
+              static final String MOCK_EXPIRES="mock_token_expires";
+
+              static final String REAL_ACCOUNT="real_account_alias";
+              static final String REAL_APPKEY="real_app_key";
+              static final String REAL_SECRET="real_app_secret";
+              static final String REAL_TOKEN="real_access_token";
+              static final String REAL_EXPIRES="real_token_expires";
+
+              static class Stock {
+                  String code,name,marketName,state,auditInfo,nxtEnable;
+                  Stock(String c,String n,String m,String s,String a,String x){
+                      code=c; name=n; marketName=m; state=s; auditInfo=a; nxtEnable=x;
+                  }
+              }
+
+              int dp(int v){
+                  return (int)(v*getResources().getDisplayMetrics().density+0.5f);
+              }
+
+              TextView text(String s,int size,int color,boolean bold){
+                  TextView t=new TextView(this);
+                  t.setText(s); t.setTextSize(size); t.setTextColor(color);
+                  t.setPadding(0,dp(5),0,dp(5));
+                  if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+                  return t;
+              }
+
+              GradientDrawable bg(int color,int radius){
+                  GradientDrawable g=new GradientDrawable();
+                  g.setColor(color); g.setCornerRadius(dp(radius)); return g;
+              }
+
+              LinearLayout card(){
+                  LinearLayout c=new LinearLayout(this);
+                  c.setOrientation(LinearLayout.VERTICAL);
+                  c.setPadding(dp(16),dp(14),dp(16),dp(14));
+                  c.setBackground(bg(PANEL,16));
+                  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+                  lp.setMargins(0,0,0,dp(12));
+                  c.setLayoutParams(lp);
+                  return c;
+              }
+
+              EditText input(String hint, boolean secret){
+                  EditText e=new EditText(this);
+                  e.setHint(hint); e.setHintTextColor(MUTED); e.setTextColor(TEXT);
+                  e.setSingleLine(true); e.setPadding(dp(14),dp(11),dp(14),dp(11));
+                  e.setBackground(bg(PANEL2,12));
+                  e.setInputType(
+                      InputType.TYPE_CLASS_TEXT |
+                      (secret ? InputType.TYPE_TEXT_VARIATION_PASSWORD : InputType.TYPE_TEXT_VARIATION_NORMAL)
+                  );
+                  return e;
+              }
+
+              Button button(String s){
+                  Button b=new Button(this);
+                  b.setText(s); b.setAllCaps(false);
+                  return b;
+              }
+
+              @Override public void onCreate(Bundle b){
+                  super.onCreate(b);
+                  prefs=getSharedPreferences(PREFS,MODE_PRIVATE);
+
+                  LinearLayout root=new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setBackgroundColor(BG);
+
+                  ScrollView scroll=new ScrollView(this);
+                  content=new LinearLayout(this);
+                  content.setOrientation(LinearLayout.VERTICAL);
+                  content.setPadding(dp(18),dp(18),dp(18),dp(24));
+                  scroll.addView(content);
+                  root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+
+                  nav=new LinearLayout(this);
+                  nav.setOrientation(LinearLayout.HORIZONTAL);
+                  nav.setGravity(Gravity.CENTER);
+                  nav.setBackgroundColor(Color.rgb(11,20,36));
+                  root.addView(nav,new LinearLayout.LayoutParams(-1,dp(66)));
+
+                  setContentView(root);
+                  buildNav();
+                  showHome();
+              }
+
+              void buildNav(){
+                  addNav("홈",v->showHome());
+                  addNav("종목",v->showStocks());
+                  addNav("AI검색",v->showAI());
+                  addNav("관심",v->showFavorites());
+                  addNav("설정",v->showSettings());
+              }
+
+              void addNav(String s,View.OnClickListener l){
+                  Button b=new Button(this);
+                  b.setText(s); b.setTextSize(12); b.setTextColor(TEXT);
+                  b.setAllCaps(false); b.setBackgroundColor(Color.TRANSPARENT);
+                  b.setOnClickListener(l);
+                  nav.addView(b,new LinearLayout.LayoutParams(0,-1,1));
+              }
+
+              void clear(String title,String sub){
+                  content.removeAllViews();
+                  content.addView(text(title,26,TEXT,true));
+                  if(sub!=null)content.addView(text(sub,13,MUTED,false));
+                  Space sp=new Space(this);
+                  content.addView(sp,new LinearLayout.LayoutParams(1,dp(10)));
+              }
+
+              boolean isReal(String env){ return REAL.equals(env); }
+
+              String activeEnv(){
+                  return prefs.getString(KEY_ENV,MOCK);
+              }
+
+              String baseUrl(String env){
+                  return isReal(env) ? "https://api.kiwoom.com" : "https://mockapi.kiwoom.com";
+              }
+
+              String accountKey(String env){ return isReal(env) ? REAL_ACCOUNT : MOCK_ACCOUNT; }
+              String appKeyKey(String env){ return isReal(env) ? REAL_APPKEY : MOCK_APPKEY; }
+              String secretKey(String env){ return isReal(env) ? REAL_SECRET : MOCK_SECRET; }
+              String tokenKey(String env){ return isReal(env) ? REAL_TOKEN : MOCK_TOKEN; }
+              String expiresKey(String env){ return isReal(env) ? REAL_EXPIRES : MOCK_EXPIRES; }
+
+              boolean credentialsReady(String env){
+                  return !prefs.getString(appKeyKey(env),"").isEmpty()
+                      && !prefs.getString(secretKey(env),"").isEmpty();
+              }
+
+              boolean tokenReady(String env){
+                  return !prefs.getString(tokenKey(env),"").isEmpty();
+              }
+
+              void showHome(){
+                  clear("Marcus AI SWING","실전/모의 고정 패널 · v0.2.4");
+
+                  LinearLayout a=card();
+                  a.addView(text("키움 REST API 계정 상태",18,TEXT,true));
+                  addEnvStatus(a,MOCK);
+                  addEnvStatus(a,REAL);
+                  content.addView(a);
+
+                  LinearLayout b=card();
+                  b.addView(text("현재 데이터 환경",17,TEXT,true));
+                  b.addView(text(activeEnv(),18,BLUE,true));
+                  b.addView(text(
+                      "종목 조회는 현재 선택된 환경의 토큰만 사용합니다.",
+                      13,MUTED,false
+                  ));
+                  content.addView(b);
+              }
+
+              void addEnvStatus(LinearLayout c,String env){
+                  String alias=prefs.getString(accountKey(env),"미지정");
+                  String state;
+                  int color;
+
+                  if(tokenReady(env)){
+                      state="🟢 연결 완료";
+                      color=GREEN;
+                  }else if(credentialsReady(env)){
+                      state="🟡 키 저장됨 / 인증 전";
+                      color=YELLOW;
+                  }else{
+                      state="⚪ 미설정";
+                      color=MUTED;
+                  }
+
+                  c.addView(text(
+                      env+" · 계좌 "+alias+" · "+state,
+                      14,color,true
+                  ));
+
+                  if(tokenReady(env)){
+                      c.addView(text(
+                          "토큰 만료: "+prefs.getString(expiresKey(env),"-"),
+                          12,MUTED,false
+                      ));
+                  }
+              }
+
+              void showSettings(){
+                  clear("설정","키움 REST API · 실전/모의 완전 분리");
+
+                  content.addView(buildEnvCard(MOCK));
+                  content.addView(buildEnvCard(REAL));
+
+                  LinearLayout w=card();
+                  w.addView(text("연결 규칙",17,TEXT,true));
+                  w.addView(text(
+                      "모의투자 → https://mockapi.kiwoom.com",
+                      13,BLUE,true
+                  ));
+                  w.addView(text(
+                      "실전투자 → https://api.kiwoom.com",
+                      13,BLUE,true
+                  ));
+                  w.addView(text(
+                      "각 카드의 키는 서로 공유하거나 덮어쓰지 않습니다.",
+                      13,MUTED,false
+                  ));
+                  w.addView(text(
+                      "휴대폰 공인 IP를 등록했다면 Wi-Fi를 끄고 LTE/5G로 테스트하세요.",
+                      13,YELLOW,false
+                  ));
+                  content.addView(w);
+              }
+
+              LinearLayout buildEnvCard(String env){
+                  LinearLayout c=card();
+
+                  boolean real=isReal(env);
+                  String endpoint=baseUrl(env);
+
+                  c.addView(text(
+                      (real ? "🔴 " : "🔵 ")+env,
+                      20,TEXT,true
+                  ));
+                  c.addView(text(
+                      "인증 서버: "+endpoint,
+                      12,BLUE,true
+                  ));
+
+                  EditText account=input("계좌 별칭 또는 끝 4자리",false);
+                  EditText key=input("이 환경의 App Key 입력",true);
+                  EditText sec=input("이 환경의 App Secret 입력",true);
+
+                  c.addView(text("계좌 구분",13,MUTED,true));
+                  c.addView(account);
+                  c.addView(text("App Key",13,MUTED,true));
+                  c.addView(key);
+                  c.addView(text("App Secret",13,MUTED,true));
+                  c.addView(sec);
+
+                  Button save=button(env+" 키 저장");
+                  Button test=button(env+" 연결 테스트");
+                  Button use=button(env+"을 종목조회 환경으로 사용");
+                  Button del=button(env+" 저장정보 삭제");
+
+                  ProgressBar pb=new ProgressBar(this);
+                  pb.setVisibility(View.GONE);
+                  TextView status=text("",14,MUTED,true);
+
+                  c.addView(save);
+                  c.addView(test);
+                  c.addView(use);
+                  c.addView(del);
+                  c.addView(pb);
+                  c.addView(status);
+
+                  Runnable refresh=()->{
+                      String alias=prefs.getString(accountKey(env),"");
+                      String k=prefs.getString(appKeyKey(env),"");
+                      String s=prefs.getString(secretKey(env),"");
+
+                      account.setHint(alias.isEmpty()
+                          ? "계좌 별칭 또는 끝 4자리"
+                          : "저장됨: "+alias);
+
+                      key.setHint(k.isEmpty()
+                          ? env+" App Key 입력"
+                          : "저장됨 · 새 값 입력 시 교체");
+
+                      sec.setHint(s.isEmpty()
+                          ? env+" App Secret 입력"
+                          : "저장됨 · 새 값 입력 시 교체");
+
+                      StringBuilder sb=new StringBuilder();
+                      sb.append("서버: ").append(endpoint).append("\n");
+                      sb.append("계좌: ").append(alias.isEmpty()?"미지정":alias).append("\n");
+
+                      if(!k.isEmpty()&&!s.isEmpty()){
+                          sb.append("🟢 Key/Secret 저장됨\n");
+                          sb.append("App Key: ").append(mask(k)).append("\n");
+                          sb.append("Secret: ").append(mask(s)).append("\n");
+                      }else{
+                          sb.append("⚪ Key/Secret 미설정\n");
+                      }
+
+                      if(tokenReady(env)){
+                          sb.append("🟢 OAuth 연결 완료\n");
+                          sb.append("만료: ").append(prefs.getString(expiresKey(env),"-"));
+                          status.setTextColor(GREEN);
+                      }else if(credentialsReady(env)){
+                          sb.append("🟡 OAuth 인증 전");
+                          status.setTextColor(YELLOW);
+                      }else{
+                          status.setTextColor(MUTED);
+                      }
+
+                      if(env.equals(activeEnv())){
+                          sb.append("\n⭐ 현재 종목조회 환경");
+                      }
+
+                      status.setText(sb.toString());
+                  };
+
+                  save.setOnClickListener(v->{
+                      SharedPreferences.Editor ed=prefs.edit();
+
+                      String alias=account.getText().toString().trim();
+                      String newKey=key.getText().toString().trim();
+                      String newSec=sec.getText().toString().trim();
+
+                      if(!alias.isEmpty()) ed.putString(accountKey(env),alias);
+                      if(!newKey.isEmpty()) ed.putString(appKeyKey(env),newKey);
+                      if(!newSec.isEmpty()) ed.putString(secretKey(env),newSec);
+
+                      if(!newKey.isEmpty() || !newSec.isEmpty()){
+                          ed.remove(tokenKey(env));
+                          ed.remove(expiresKey(env));
+                      }
+
+                      ed.apply();
+
+                      account.setText("");
+                      key.setText("");
+                      sec.setText("");
+
+                      Toast.makeText(
+                          this,
+                          env+" 키 저장 완료",
+                          Toast.LENGTH_SHORT
+                      ).show();
+
+                      refresh.run();
+                  });
+
+                  test.setOnClickListener(v->{
+                      String k=prefs.getString(appKeyKey(env),"");
+                      String s=prefs.getString(secretKey(env),"");
+
+                      if(k.isEmpty()||s.isEmpty()){
+                          status.setText(
+                              "🔴 "+env+" App Key/Secret을 먼저 저장하세요.\n"+
+                              "요청 서버: "+endpoint
+                          );
+                          status.setTextColor(RED);
+                          return;
+                      }
+
+                      pb.setVisibility(View.VISIBLE);
+                      test.setEnabled(false);
+                      status.setText(
+                          env+" OAuth 인증 요청 중...\n"+
+                          "요청 서버: "+endpoint
+                      );
+                      status.setTextColor(BLUE);
+
+                      new Thread(()->{
+                          try{
+                              JSONObject r=requestToken(env,k,s);
+
+                              int rc=r.optInt("return_code",-999);
+                              String msg=r.optString("return_msg","응답 메시지 없음");
+                              String token=r.optString("token","");
+
+                              if(rc==0&&!token.isEmpty()){
+                                  prefs.edit()
+                                      .putString(tokenKey(env),token)
+                                      .putString(
+                                          expiresKey(env),
+                                          r.optString("expires_dt","")
+                                      )
+                                      .putString(KEY_ENV,env)
+                                      .apply();
+
+                                  runOnUiThread(()->{
+                                      pb.setVisibility(View.GONE);
+                                      test.setEnabled(true);
+                                      status.setText(
+                                          "🟢 "+env+" 연결 성공\n"+
+                                          "서버: "+endpoint+"\n"+
+                                          "OAuth 토큰 발급 완료\n"+
+                                          "계좌: "+prefs.getString(accountKey(env),"미지정")+"\n"+
+                                          "만료: "+prefs.getString(expiresKey(env),"-")+
+                                          "\n⭐ 현재 종목조회 환경으로 자동 선택됨"
+                                      );
+                                      status.setTextColor(GREEN);
+                                  });
+                              }else{
+                                  runOnUiThread(()->{
+                                      pb.setVisibility(View.GONE);
+                                      test.setEnabled(true);
+                                      status.setText(
+                                          "🔴 "+env+" 인증 실패\n"+
+                                          "요청 서버: "+endpoint+"\n"+
+                                          "return_code: "+rc+"\n"+
+                                          msg+"\n\n"+
+                                          "※ 8030이면 이 카드에 반대 환경의 App Key를 넣은 것입니다."
+                                      );
+                                      status.setTextColor(RED);
+                                  });
+                              }
+
+                          }catch(Exception e){
+                              runOnUiThread(()->{
+                                  pb.setVisibility(View.GONE);
+                                  test.setEnabled(true);
+                                  status.setText(
+                                      "🔴 "+env+" 연결 실패\n"+
+                                      "요청 서버: "+endpoint+"\n"+
+                                      safeError(e)
+                                  );
+                                  status.setTextColor(RED);
+                              });
+                          }
+                      }).start();
+                  });
+
+                  use.setOnClickListener(v->{
+                      if(!tokenReady(env)){
+                          Toast.makeText(
+                              this,
+                              env+" 연결 테스트를 먼저 성공시켜주세요.",
+                              Toast.LENGTH_SHORT
+                          ).show();
+                          return;
+                      }
+
+                      prefs.edit().putString(KEY_ENV,env).apply();
+
+                      Toast.makeText(
+                          this,
+                          env+"을 종목조회 환경으로 선택했습니다.",
+                          Toast.LENGTH_SHORT
+                      ).show();
+
+                      refresh.run();
+                  });
+
+                  del.setOnClickListener(v->{
+                      prefs.edit()
+                          .remove(accountKey(env))
+                          .remove(appKeyKey(env))
+                          .remove(secretKey(env))
+                          .remove(tokenKey(env))
+                          .remove(expiresKey(env))
+                          .apply();
+
+                      stockList.clear();
+                      account.setText("");
+                      key.setText("");
+                      sec.setText("");
+
+                      Toast.makeText(
+                          this,
+                          env+" 저장정보 삭제 완료",
+                          Toast.LENGTH_SHORT
+                      ).show();
+
+                      refresh.run();
+                  });
+
+                  refresh.run();
+                  return c;
+              }
+
+              JSONObject requestToken(String env,String appKey,String secret)throws Exception{
+                  JSONObject b=new JSONObject();
+                  b.put("grant_type","client_credentials");
+                  b.put("appkey",appKey);
+                  b.put("secretkey",secret);
+
+                  HttpResult r=postJson(
+                      baseUrl(env)+"/oauth2/token",
+                      b.toString(),
+                      null,
+                      null
+                  );
+
+                  if(r.body==null||r.body.trim().isEmpty()){
+                      throw new Exception("OAuth 응답이 비어 있습니다. HTTP "+r.code);
+                  }
+
+                  return new JSONObject(r.body);
+              }
+
+              void showStocks(){
+                  String env=activeEnv();
+                  clear("전체 종목","키움 ka10099 · 현재 환경: "+env);
+
+                  LinearLayout ctl=card();
+                  ctl.addView(text(
+                      "사용 계정: "+env+" · "+prefs.getString(accountKey(env),"미지정"),
+                      14,BLUE,true
+                  ));
+
+                  Spinner market=new Spinner(this);
+                  market.setAdapter(new ArrayAdapter<String>(
+                      this,
+                      android.R.layout.simple_spinner_dropdown_item,
+                      new String[]{"KOSPI","KOSDAQ"}
+                  ));
+
+                  Button load=button("키움에서 전체 종목 불러오기");
+                  ProgressBar pb=new ProgressBar(this);
+                  pb.setVisibility(View.GONE);
+
+                  TextView stat=text(
+                      tokenReady(env)
+                          ? "🟢 "+env+" 토큰 준비됨"
+                          : "🟡 설정에서 "+env+" 연결 테스트를 먼저 실행하세요.",
+                      13,
+                      tokenReady(env)?GREEN:YELLOW,
+                      true
+                  );
+
+                  ctl.addView(market);
+                  ctl.addView(load);
+                  ctl.addView(pb);
+                  ctl.addView(stat);
+                  content.addView(ctl);
+
+                  EditText search=new EditText(this);
+                  search.setHint("종목명 또는 종목코드 검색");
+                  search.setHintTextColor(MUTED);
+                  search.setTextColor(TEXT);
+                  search.setSingleLine(true);
+                  search.setBackground(bg(PANEL2,14));
+                  search.setPadding(dp(14),dp(12),dp(14),dp(12));
+                  content.addView(search);
+
+                  LinearLayout list=new LinearLayout(this);
+                  list.setOrientation(LinearLayout.VERTICAL);
+                  content.addView(list);
+
+                  search.addTextChangedListener(new TextWatcher(){
+                      public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+                      public void onTextChanged(CharSequence s,int st,int b,int c){
+                          renderStocks(list,s.toString());
+                      }
+                      public void afterTextChanged(Editable e){}
+                  });
+
+                  load.setOnClickListener(v->{
+                      String selectedEnv=activeEnv();
+
+                      if(!tokenReady(selectedEnv)){
+                          stat.setText(
+                              "🔴 설정 → "+selectedEnv+" 연결 테스트를 먼저 성공시켜주세요."
+                          );
+                          stat.setTextColor(RED);
+                          return;
+                      }
+
+                      String tp=market.getSelectedItemPosition()==0?"0":"10";
+                      pb.setVisibility(View.VISIBLE);
+                      load.setEnabled(false);
+                      stat.setText(selectedEnv+" 종목 리스트 요청 중...");
+                      stat.setTextColor(BLUE);
+
+                      new Thread(()->{
+                          try{
+                              List<Stock> got=fetchStockList(selectedEnv,tp);
+
+                              synchronized(stockList){
+                                  stockList.clear();
+                                  stockList.addAll(got);
+                              }
+
+                              runOnUiThread(()->{
+                                  pb.setVisibility(View.GONE);
+                                  load.setEnabled(true);
+                                  stat.setText(
+                                      "🟢 "+selectedEnv+" · "+market.getSelectedItem()+
+                                      " "+got.size()+"개 종목 수신"
+                                  );
+                                  stat.setTextColor(GREEN);
+                                  renderStocks(list,search.getText().toString());
+                              });
+                          }catch(Exception e){
+                              runOnUiThread(()->{
+                                  pb.setVisibility(View.GONE);
+                                  load.setEnabled(true);
+                                  stat.setText(
+                                      "🔴 종목조회 실패\n"+safeError(e)
+                                  );
+                                  stat.setTextColor(RED);
+                              });
+                          }
+                      }).start();
+                  });
+              }
+
+              List<Stock> fetchStockList(String env,String tp)throws Exception{
+                  JSONObject b=new JSONObject();
+                  b.put("mrkt_tp",tp);
+
+                  HttpResult r=postJson(
+                      baseUrl(env)+"/api/dostk/stkinfo",
+                      b.toString(),
+                      "Bearer "+prefs.getString(tokenKey(env),""),
+                      "ka10099"
+                  );
+
+                  if(r.body==null||r.body.trim().isEmpty()){
+                      throw new Exception("종목정보 응답이 비어 있습니다. HTTP "+r.code);
+                  }
+
+                  JSONObject j=new JSONObject(r.body);
+
+                  if(j.optInt("return_code",-999)!=0){
+                      throw new Exception(
+                          "return_code "+j.optInt("return_code")+
+                          " · "+j.optString("return_msg","오류")
+                      );
+                  }
+
+                  JSONArray a=j.optJSONArray("list");
+                  if(a==null)throw new Exception("응답에 list 배열이 없습니다.");
+
+                  List<Stock> out=new ArrayList<>();
+
+                  for(int i=0;i<a.length();i++){
+                      JSONObject o=a.optJSONObject(i);
+                      if(o==null)continue;
+
+                      out.add(new Stock(
+                          o.optString("code"),
+                          o.optString("name"),
+                          o.optString("marketName"),
+                          o.optString("state"),
+                          o.optString("auditInfo"),
+                          o.optString("nxtEnable")
+                      ));
+                  }
+
+                  return out;
+              }
+
+              void renderStocks(LinearLayout list,String q){
+                  list.removeAllViews();
+                  q=q==null?"":q.trim().toLowerCase();
+                  int shown=0;
+
+                  synchronized(stockList){
+                      for(Stock s:stockList){
+                          if(
+                              q.isEmpty() ||
+                              s.name.toLowerCase().contains(q) ||
+                              s.code.contains(q)
+                          ){
+                              LinearLayout c=card();
+
+                              c.addView(text(
+                                  s.name+"   "+s.code,
+                                  17,TEXT,true
+                              ));
+
+                              c.addView(text(
+                                  empty(s.marketName)+
+                                  " · 상태 "+empty(s.state)+
+                                  " · NXT "+empty(s.nxtEnable),
+                                  12,MUTED,false
+                              ));
+
+                              c.setOnClickListener(v->showDetail(s));
+                              list.addView(c);
+                              shown++;
+
+                              if(q.isEmpty()&&shown>=200){
+                                  list.addView(text(
+                                      "전체 "+stockList.size()+
+                                      "개 중 200개 표시 · 검색창을 이용하세요.",
+                                      13,BLUE,true
+                                  ));
+                                  break;
+                              }
+                          }
+                      }
+                  }
+
+                  if(shown==0&&!stockList.isEmpty()){
+                      list.addView(text("검색 결과가 없습니다.",15,MUTED,false));
+                  }
+              }
+
+              void showDetail(Stock s){
+                  clear(s.name,s.code+" · "+empty(s.marketName));
+
+                  LinearLayout c=card();
+                  c.addView(text("종목정보",18,TEXT,true));
+                  c.addView(text("상태       "+empty(s.state),14,TEXT,false));
+                  c.addView(text("감사정보   "+empty(s.auditInfo),14,TEXT,false));
+                  c.addView(text("NXT 가능   "+empty(s.nxtEnable),14,TEXT,false));
+                  content.addView(c);
+
+                  LinearLayout n=card();
+                  n.addView(text("다음 단계",18,TEXT,true));
+                  n.addView(text(
+                      "현재가 · 거래량 · 일봉차트 · AI SWING 점수 연결",
+                      14,BLUE,false
+                  ));
+                  content.addView(n);
+              }
+
+              void showAI(){
+                  clear("AI 검색","AI SWING Scanner");
+                  LinearLayout c=card();
+
+                  if(stockList.isEmpty()){
+                      c.addView(text(
+                          "먼저 종목 탭에서 실제 종목 리스트를 불러오세요.",
+                          14,YELLOW,false
+                      ));
+                  }else{
+                      c.addView(text(
+                          "실제 종목 "+stockList.size()+
+                          "개 준비됨 · 다음은 일봉 OHLCV 연결",
+                          14,GREEN,true
+                      ));
+                  }
+
+                  content.addView(c);
+              }
+
+              void showFavorites(){
+                  clear("관심종목","다음 단계에서 실제 종목 영구 저장/편집 연결");
+                  LinearLayout c=card();
+                  c.addView(text(
+                      "관심종목 기능은 다음 버전에서 연결합니다.",
+                      14,MUTED,false
+                  ));
+                  content.addView(c);
+              }
+
+              static class HttpResult{
+                  int code; String body;
+                  HttpResult(int c,String b){code=c;body=b;}
+              }
+
+              HttpResult postJson(
+                  String u,String body,String auth,String apiId
+              )throws Exception{
+
+                  HttpURLConnection c=
+                      (HttpURLConnection)new URL(u).openConnection();
+
+                  try{
+                      c.setRequestMethod("POST");
+                      c.setConnectTimeout(15000);
+                      c.setReadTimeout(20000);
+                      c.setDoOutput(true);
+
+                      c.setRequestProperty(
+                          "Content-Type",
+                          "application/json;charset=UTF-8"
+                      );
+
+                      if(auth!=null)c.setRequestProperty("authorization",auth);
+                      if(apiId!=null)c.setRequestProperty("api-id",apiId);
+
+                      byte[] bytes=body.getBytes(StandardCharsets.UTF_8);
+
+                      try(OutputStream os=c.getOutputStream()){
+                          os.write(bytes);
+                      }
+
+                      int code=c.getResponseCode();
+
+                      InputStream is=
+                          (code>=200&&code<400)
+                          ? c.getInputStream()
+                          : c.getErrorStream();
+
+                      return new HttpResult(code,readAll(is));
+
+                  }finally{
+                      c.disconnect();
+                  }
+              }
+
+              String readAll(InputStream is)throws Exception{
+                  if(is==null)return "";
+
+                  BufferedReader br=new BufferedReader(
+                      new InputStreamReader(is,StandardCharsets.UTF_8)
+                  );
+
+                  StringBuilder sb=new StringBuilder();
+                  String line;
+
+                  while((line=br.readLine())!=null){
+                      sb.append(line);
+                  }
+
+                  br.close();
+                  return sb.toString();
+              }
+
+              String safeError(Exception e){
+                  String m=e.getMessage();
+                  return (m==null||m.isEmpty())
+                      ? e.getClass().getSimpleName()
+                      : m;
+              }
+
+              String empty(String s){
+                  return s==null||s.trim().isEmpty()?"-":s;
+              }
+
+              String mask(String v){
+                  if(v==null||v.isEmpty())return "미설정";
+                  if(v.length()<=8)return "••••••••";
+                  return v.substring(0,4)+"••••••"+v.substring(v.length()-4);
+              }
+          }
+          JAVA
+
+      - name: Build APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Marcus-AI-SWING-v0.2.4-FIXED-DUAL-KIWOOM
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
