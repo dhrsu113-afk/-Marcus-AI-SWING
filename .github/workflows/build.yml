@@ -1,405 +1,293 @@
 name: Marcus AI SWING v0.1 APK
 
 on:
-workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
-build:
-runs-on: ubuntu-latest
-
-steps:  
-  - name: Checkout  
-    uses: actions/checkout@v4  
-
-  - name: Set up Java 17  
-    uses: actions/setup-java@v4  
-    with:  
-      distribution: temurin  
-      java-version: '17'  
-
-  - name: Set up Gradle  
-    uses: gradle/actions/setup-gradle@v4  
-    with:  
-      gradle-version: '8.2'  
-
-  - name: Generate Android project  
-    shell: bash  
-    run: |  
-      set -e  
-
-      mkdir -p app/src/main/java/com/marcus/aiswing  
-      mkdir -p app/src/main/res/values  
-
-      cat > settings.gradle <<'EOF'  
-      pluginManagement {  
-          repositories {  
-              google()  
-              mavenCentral()  
-              gradlePluginPortal()  
-          }  
-      }  
-
-      dependencyResolutionManagement {  
-          repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)  
-          repositories {  
-              google()  
-              mavenCentral()  
-          }  
-      }  
-
-      rootProject.name = "MarcusAISwing"  
-      include(":app")  
-      EOF  
-
-      cat > build.gradle <<'EOF'  
-      plugins {  
-          id 'com.android.application' version '8.2.2' apply false  
-      }  
-      EOF  
-
-      cat > app/build.gradle <<'EOF'  
-      plugins {  
-          id 'com.android.application'  
-      }  
-
-      android {  
-          namespace 'com.marcus.aiswing'  
-          compileSdk 34  
-
-          defaultConfig {  
-              applicationId "com.marcus.aiswing"  
-              minSdk 26  
-              targetSdk 34  
-              versionCode 1  
-              versionName "0.1"  
-          }  
-
-          buildTypes {  
-              release {  
-                  minifyEnabled false  
-              }  
-          }  
-
-          compileOptions {  
-              sourceCompatibility JavaVersion.VERSION_17  
-              targetCompatibility JavaVersion.VERSION_17  
-          }  
-      }  
-      EOF  
-
-      cat > app/src/main/AndroidManifest.xml <<'EOF'  
-      <manifest xmlns:android="http://schemas.android.com/apk/res/android">  
-
-          <application  
-              android:label="Marcus AI SWING"  
-              android:theme="@style/AppTheme">  
-
-              <activity  
-                  android:name=".MainActivity"  
-                  android:exported="true">  
-
-                  <intent-filter>  
-                      <action android:name="android.intent.action.MAIN"/>  
-                      <category android:name="android.intent.category.LAUNCHER"/>  
-                  </intent-filter>  
-
-              </activity>  
-
-          </application>  
-
-      </manifest>  
-      EOF  
-
-      cat > app/src/main/res/values/styles.xml <<'EOF'  
-      <resources>  
-
-          <style  
-              name="AppTheme"  
-              parent="@android:style/Theme.Material.NoActionBar">  
-
-              <item name="android:fontFamily">sans</item>  
-
-              <item name="android:statusBarColor">  
-                  #09111F  
-              </item>  
-
-              <item name="android:navigationBarColor">  
-                  #09111F  
-              </item>  
-
-          </style>  
-
-      </resources>  
-      EOF  
-
-      cat > app/src/main/java/com/marcus/aiswing/MainActivity.java <<'EOF'  
-      package com.marcus.aiswing;  
-
-      import android.app.Activity;  
-      import android.os.Bundle;  
-      import android.graphics.Color;  
-      import android.graphics.Typeface;  
-      import android.widget.*;  
-      import android.graphics.drawable.GradientDrawable;  
-
-      public class MainActivity extends Activity {  
-
-          int dp(int v) {  
-              return (int)(  
-                  v * getResources()  
-                  .getDisplayMetrics()  
-                  .density + 0.5f  
-              );  
-          }  
-
-          TextView text(  
-              String s,  
-              int size,  
-              int color,  
-              boolean bold  
-          ) {  
-
-              TextView t = new TextView(this);  
-
-              t.setText(s);  
-
-              t.setTextSize(size);  
-
-              t.setTextColor(color);  
-
-              t.setPadding(  
-                  0,  
-                  dp(6),  
-                  0,  
-                  dp(6)  
-              );  
-
-              if (bold) {  
-
-                  t.setTypeface(  
-                      Typeface.DEFAULT,  
-                      Typeface.BOLD  
-                  );  
-
-              }  
-
-              return t;  
-          }  
-
-          LinearLayout card() {  
-
-              LinearLayout c =  
-                  new LinearLayout(this);  
-
-              c.setOrientation(  
-                  LinearLayout.VERTICAL  
-              );  
-
-              c.setPadding(  
-                  dp(16),  
-                  dp(14),  
-                  dp(16),  
-                  dp(14)  
-              );  
-
-              GradientDrawable g =  
-                  new GradientDrawable();  
-
-              g.setColor(  
-                  Color.rgb(  
-                      19,  
-                      29,  
-                      49  
-                  )  
-              );  
-
-              g.setCornerRadius(  
-                  dp(16)  
-              );  
-
-              c.setBackground(g);  
-
-              LinearLayout.LayoutParams p =  
-                  new LinearLayout.LayoutParams(  
-                      -1,  
-                      -2  
-                  );  
-
-              p.setMargins(  
-                  0,  
-                  0,  
-                  0,  
-                  dp(12)  
-              );  
-
-              c.setLayoutParams(p);  
-
-              return c;  
-          }  
-
-          @Override  
-          public void onCreate(  
-              Bundle b  
-          ) {  
-
-              super.onCreate(b);  
-
-              int BG =  
-                  Color.rgb(  
-                      9,  
-                      17,  
-                      31  
-                  );  
-
-              int TEXT =  
-                  Color.rgb(  
-                      238,  
-                      243,  
-                      255  
-                  );  
-
-              int MUTED =  
-                  Color.rgb(  
-                      154,  
-                      168,  
-                      199  
-                  );  
-
-              int GREEN =  
-                  Color.rgb(  
-                      117,  
-                      230,  
-                      165  
-                  );  
-
-              ScrollView scroll =  
-                  new ScrollView(this);  
-
-              scroll.setBackgroundColor(BG);  
-
-              LinearLayout root =  
-                  new LinearLayout(this);  
-
-              root.setOrientation(  
-                  LinearLayout.VERTICAL  
-              );  
-
-              root.setPadding(  
-                  dp(18),  
-                  dp(24),  
-                  dp(18),  
-                  dp(30)  
-              );  
-
-              scroll.addView(root);  
-
-              root.addView(  
-                  text(  
-                      "Marcus AI SWING",  
-                      28,  
-                      TEXT,  
-                      true  
-                  )  
-              );  
-
-              root.addView(  
-                  text(  
-                      "Android v0.1",  
-                      14,  
-                      MUTED,  
-                      false  
-                  )  
-              );  
-
-              LinearLayout c1 =  
-                  card();  
-
-              c1.addView(  
-                  text(  
-                      "✅ 앱 실행 성공",  
-                      18,  
-                      GREEN,  
-                      true  
-                  )  
-              );  
-
-              c1.addView(  
-                  text(  
-                      "첫 목표: APK 설치와 실행 확인",  
-                      14,  
-                      TEXT,  
-                      false  
-                  )  
-              );  
-
-              root.addView(c1);  
-
-              LinearLayout c2 =  
-                  card();  
-
-              c2.addView(  
-                  text(  
-                      "다음 v0.2",  
-                      18,  
-                      TEXT,  
-                      true  
-                  )  
-              );  
-
-              c2.addView(  
-                  text(  
-                      "네이버 데이터 · 200종목 스캔 · TOP20 · BOS · Discount · Explosion",  
-                      14,  
-                      MUTED,  
-                      false  
-                  )  
-              );  
-
-              root.addView(c2);  
-
-              Button btn =  
-                  new Button(this);  
-
-              btn.setText(  
-                  "Marcus AI SWING 시작"  
-              );  
-
-              btn.setAllCaps(false);  
-
-              btn.setOnClickListener(  
-                  v ->  
-                      Toast  
-                      .makeText(  
-                          this,  
-                          "v0.1 설치 테스트 성공!",  
-                          Toast.LENGTH_LONG  
-                      )  
-                      .show()  
-              );  
-
-              root.addView(btn);  
-
-              setContentView(scroll);  
-
-          }  
-
-      }  
-      EOF  
-
-  - name: Build APK  
-    run: gradle :app:assembleRelease --no-daemon  
-
-  - name: Prepare APK  
-    run: |  
-      mkdir -p output  
-
-      cp \  
-      app/build/outputs/apk/release/app-release.apk \  
-      output/Marcus-AI-SWING-v0.1.apk  
-
-  - name: Upload APK  
-    uses: actions/upload-artifact@v4  
-    with:  
-      name: Marcus-AI-SWING-v0.1-APK  
-      path: output/Marcus-AI-SWING-v0.1.apk  
-      retention-days: 30
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2'
+
+      - name: Create Android project
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p app/src/main/java/com/marcus/aiswing
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "MarcusAISwing"
+          include(":app")
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.2.2' apply false
+          }
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.marcus.aiswing'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.marcus.aiswing"
+                  minSdk 26
+                  targetSdk 34
+                  versionCode 1
+                  versionName "0.1"
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:label="Marcus AI SWING"
+                  android:theme="@style/AppTheme">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+
+                  </activity>
+
+              </application>
+
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+
+              <style
+                  name="AppTheme"
+                  parent="@android:style/Theme.Material.NoActionBar">
+
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:statusBarColor">#09111F</item>
+                  <item name="android:navigationBarColor">#09111F</item>
+
+              </style>
+
+          </resources>
+          EOF
+
+          cat > app/src/main/java/com/marcus/aiswing/MainActivity.java <<'EOF'
+          package com.marcus.aiswing;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+          import android.widget.Button;
+          import android.widget.Toast;
+          import android.widget.ScrollView;
+
+          public class MainActivity extends Activity {
+
+              private int dp(int value) {
+                  return (int) (
+                      value * getResources()
+                          .getDisplayMetrics()
+                          .density + 0.5f
+                  );
+              }
+
+              private TextView makeText(
+                  String value,
+                  int size,
+                  int color,
+                  boolean bold
+              ) {
+                  TextView view = new TextView(this);
+
+                  view.setText(value);
+                  view.setTextSize(size);
+                  view.setTextColor(color);
+                  view.setPadding(
+                      0,
+                      dp(8),
+                      0,
+                      dp(8)
+                  );
+
+                  if (bold) {
+                      view.setTypeface(
+                          Typeface.DEFAULT,
+                          Typeface.BOLD
+                      );
+                  }
+
+                  return view;
+              }
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  int background =
+                      Color.rgb(9, 17, 31);
+
+                  int text =
+                      Color.rgb(238, 243, 255);
+
+                  int muted =
+                      Color.rgb(154, 168, 199);
+
+                  int green =
+                      Color.rgb(117, 230, 165);
+
+                  ScrollView scroll =
+                      new ScrollView(this);
+
+                  scroll.setBackgroundColor(background);
+
+                  LinearLayout root =
+                      new LinearLayout(this);
+
+                  root.setOrientation(
+                      LinearLayout.VERTICAL
+                  );
+
+                  root.setPadding(
+                      dp(20),
+                      dp(30),
+                      dp(20),
+                      dp(30)
+                  );
+
+                  scroll.addView(root);
+
+                  root.addView(
+                      makeText(
+                          "Marcus AI SWING",
+                          28,
+                          text,
+                          true
+                      )
+                  );
+
+                  root.addView(
+                      makeText(
+                          "Android v0.1",
+                          15,
+                          muted,
+                          false
+                      )
+                  );
+
+                  root.addView(
+                      makeText(
+                          "✅ APK 실행 성공",
+                          21,
+                          green,
+                          true
+                      )
+                  );
+
+                  root.addView(
+                      makeText(
+                          "Marcus AI SWING 네이티브 Android 앱의 첫 실행 테스트입니다.",
+                          15,
+                          text,
+                          false
+                      )
+                  );
+
+                  root.addView(
+                      makeText(
+                          "다음 v0.2: 네이버 데이터 · 종목 스캔 · TOP20 · BOS · Discount · Explosion",
+                          14,
+                          muted,
+                          false
+                      )
+                  );
+
+                  Button button =
+                      new Button(this);
+
+                  button.setText(
+                      "Marcus AI SWING 시작"
+                  );
+
+                  button.setAllCaps(false);
+
+                  button.setOnClickListener(
+                      v -> Toast.makeText(
+                          this,
+                          "v0.1 앱 실행 성공!",
+                          Toast.LENGTH_LONG
+                      ).show()
+                  );
+
+                  root.addView(button);
+
+                  setContentView(scroll);
+              }
+          }
+          EOF
+
+      - name: Build installable APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Prepare APK
+        run: |
+          mkdir -p output
+          cp app/build/outputs/apk/debug/app-debug.apk output/Marcus-AI-SWING-v0.1.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Marcus-AI-SWING-v0.1-APK
+          path: output/Marcus-AI-SWING-v0.1.apk
+          retention-days: 30
