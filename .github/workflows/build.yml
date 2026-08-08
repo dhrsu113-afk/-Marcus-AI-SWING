@@ -1,10 +1,108 @@
-name: Marcus Test
+name: Marcus AI SWING APK Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
+
     steps:
-      - run: echo "Marcus OK"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2'
+
+      - name: Create Android project
+        run: |
+          mkdir -p app/src/main/java/com/marcus/aiswing
+          mkdir -p app/src/main/res/values
+
+          printf '%s\n' \
+          'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' \
+          'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' \
+          'rootProject.name = "MarcusAISwing"' \
+          'include(":app")' \
+          > settings.gradle
+
+          printf '%s\n' \
+          'plugins {' \
+          '    id "com.android.application" version "8.2.2" apply false' \
+          '}' \
+          > build.gradle
+
+          printf '%s\n' \
+          'plugins {' \
+          '    id "com.android.application"' \
+          '}' \
+          '' \
+          'android {' \
+          '    namespace "com.marcus.aiswing"' \
+          '    compileSdk 34' \
+          '' \
+          '    defaultConfig {' \
+          '        applicationId "com.marcus.aiswing"' \
+          '        minSdk 26' \
+          '        targetSdk 34' \
+          '        versionCode 1' \
+          '        versionName "0.1"' \
+          '    }' \
+          '}' \
+          > app/build.gradle
+
+          printf '%s\n' \
+          '<manifest xmlns:android="http://schemas.android.com/apk/res/android">' \
+          '    <application android:label="Marcus AI SWING" android:theme="@style/AppTheme">' \
+          '        <activity android:name=".MainActivity" android:exported="true">' \
+          '            <intent-filter>' \
+          '                <action android:name="android.intent.action.MAIN"/>' \
+          '                <category android:name="android.intent.category.LAUNCHER"/>' \
+          '            </intent-filter>' \
+          '        </activity>' \
+          '    </application>' \
+          '</manifest>' \
+          > app/src/main/AndroidManifest.xml
+
+          printf '%s\n' \
+          '<resources>' \
+          '    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar"/>' \
+          '</resources>' \
+          > app/src/main/res/values/styles.xml
+
+          printf '%s\n' \
+          'package com.marcus.aiswing;' \
+          '' \
+          'import android.app.Activity;' \
+          'import android.os.Bundle;' \
+          'import android.widget.TextView;' \
+          '' \
+          'public class MainActivity extends Activity {' \
+          '    @Override' \
+          '    protected void onCreate(Bundle savedInstanceState) {' \
+          '        super.onCreate(savedInstanceState);' \
+          '        TextView text = new TextView(this);' \
+          '        text.setText("Marcus AI SWING v0.1");' \
+          '        text.setTextSize(28);' \
+          '        text.setPadding(40, 80, 40, 40);' \
+          '        setContentView(text);' \
+          '    }' \
+          '}' \
+          > app/src/main/java/com/marcus/aiswing/MainActivity.java
+
+      - name: Build APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Marcus-AI-SWING-v0.1
+          path: app/build/outputs/apk/debug/app-debug.apk
