@@ -1,0 +1,571 @@
+name: Marcus AI SWING v0.2.1 API Settings
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2'
+
+      - name: Create Android project
+        run: |
+          mkdir -p app/src/main/java/com/marcus/aiswing
+          mkdir -p app/src/main/res/values
+
+          printf '%s\n' \
+          'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' \
+          'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' \
+          'rootProject.name = "MarcusAISwing"' \
+          'include(":app")' \
+          > settings.gradle
+
+          printf '%s\n' \
+          'plugins {' \
+          '    id "com.android.application" version "8.2.2" apply false' \
+          '}' \
+          > build.gradle
+
+          printf '%s\n' \
+          'plugins {' \
+          '    id "com.android.application"' \
+          '}' \
+          '' \
+          'android {' \
+          '    namespace "com.marcus.aiswing"' \
+          '    compileSdk 34' \
+          '' \
+          '    defaultConfig {' \
+          '        applicationId "com.marcus.aiswing"' \
+          '        minSdk 26' \
+          '        targetSdk 34' \
+          '        versionCode 3' \
+          '        versionName "0.2.1"' \
+          '    }' \
+          '}' \
+          > app/build.gradle
+
+          printf '%s\n' \
+          '<manifest xmlns:android="http://schemas.android.com/apk/res/android">' \
+          '    <application' \
+          '        android:label="Marcus AI SWING"' \
+          '        android:theme="@style/AppTheme">' \
+          '        <activity' \
+          '            android:name=".MainActivity"' \
+          '            android:screenOrientation="unspecified"' \
+          '            android:exported="true">' \
+          '            <intent-filter>' \
+          '                <action android:name="android.intent.action.MAIN"/>' \
+          '                <category android:name="android.intent.category.LAUNCHER"/>' \
+          '            </intent-filter>' \
+          '        </activity>' \
+          '    </application>' \
+          '</manifest>' \
+          > app/src/main/AndroidManifest.xml
+
+          printf '%s\n' \
+          '<resources>' \
+          '    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">' \
+          '        <item name="android:fontFamily">sans</item>' \
+          '        <item name="android:windowLightStatusBar">false</item>' \
+          '        <item name="android:statusBarColor">#07101F</item>' \
+          '        <item name="android:navigationBarColor">#07101F</item>' \
+          '        <item name="android:colorAccent">#7EA7FF</item>' \
+          '    </style>' \
+          '</resources>' \
+          > app/src/main/res/values/styles.xml
+
+          cat > app/src/main/java/com/marcus/aiswing/MainActivity.java <<'JAVA'
+          package com.marcus.aiswing;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.text.Editable;
+          import android.text.InputType;
+          import android.text.TextWatcher;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.widget.*;
+          import java.util.*;
+
+          public class MainActivity extends Activity {
+
+              final int BG = Color.rgb(7,16,31);
+              final int PANEL = Color.rgb(17,28,48);
+              final int PANEL2 = Color.rgb(24,38,63);
+              final int TEXT = Color.rgb(239,244,255);
+              final int MUTED = Color.rgb(151,166,195);
+              final int BLUE = Color.rgb(126,167,255);
+              final int GREEN = Color.rgb(103,220,157);
+              final int RED = Color.rgb(255,116,116);
+
+              LinearLayout content;
+              LinearLayout nav;
+              final Set<String> favorites = new HashSet<>();
+              SharedPreferences prefs;
+
+              static final String PREFS = "marcus_api_settings";
+              static final String KEY_ENV = "kiwoom_env";
+              static final String KEY_APPKEY = "kiwoom_app_key";
+              static final String KEY_SECRET = "kiwoom_app_secret";
+
+              final String[][] stocks = {
+                  {"삼성전자","005930","KOSPI","72,500","+1.2%","78"},
+                  {"SK하이닉스","000660","KOSPI","188,500","+2.4%","84"},
+                  {"넷마블","251270","KOSPI","59,000","+6.1%","87"},
+                  {"GS리테일","007070","KOSPI","26,600","+3.5%","81"},
+                  {"빙그레","005180","KOSPI","84,100","+2.2%","83"},
+                  {"BGF","027410","KOSPI","4,290","+8.4%","76"},
+                  {"한진칼","180640","KOSPI","59,000","+6.1%","86"},
+                  {"컴투스","078340","KOSDAQ","31,750","-1.1%","81"},
+                  {"동원시스템즈","014820","KOSPI","21,350","+1.0%","63"},
+                  {"유한양행","000100","KOSPI","121,500","+1.7%","82"},
+                  {"팬오션","028670","KOSPI","4,210","+0.4%","71"},
+                  {"SFA반도체","036540","KOSDAQ","6,820","+2.8%","79"}
+              };
+
+              int dp(int v) {
+                  return (int)(v * getResources().getDisplayMetrics().density + 0.5f);
+              }
+
+              TextView text(String s, int size, int color, boolean bold) {
+                  TextView t = new TextView(this);
+                  t.setText(s);
+                  t.setTextSize(size);
+                  t.setTextColor(color);
+                  t.setPadding(0,dp(5),0,dp(5));
+                  if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                  return t;
+              }
+
+              GradientDrawable bg(int color, int radius) {
+                  GradientDrawable g = new GradientDrawable();
+                  g.setColor(color);
+                  g.setCornerRadius(dp(radius));
+                  return g;
+              }
+
+              LinearLayout card() {
+                  LinearLayout c = new LinearLayout(this);
+                  c.setOrientation(LinearLayout.VERTICAL);
+                  c.setPadding(dp(16),dp(14),dp(16),dp(14));
+                  c.setBackground(bg(PANEL,16));
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,-2);
+                  lp.setMargins(0,0,0,dp(12));
+                  c.setLayoutParams(lp);
+                  return c;
+              }
+
+              EditText input(String hint) {
+                  EditText e = new EditText(this);
+                  e.setHint(hint);
+                  e.setHintTextColor(MUTED);
+                  e.setTextColor(TEXT);
+                  e.setSingleLine(true);
+                  e.setPadding(dp(14),dp(11),dp(14),dp(11));
+                  e.setBackground(bg(PANEL2,12));
+                  e.setInputType(
+                      InputType.TYPE_CLASS_TEXT |
+                      InputType.TYPE_TEXT_VARIATION_PASSWORD
+                  );
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,dp(52));
+                  lp.setMargins(0,dp(4),0,dp(10));
+                  e.setLayoutParams(lp);
+                  return e;
+              }
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setBackgroundColor(BG);
+
+                  FrameLayout body = new FrameLayout(this);
+                  root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
+
+                  ScrollView scroll = new ScrollView(this);
+                  content = new LinearLayout(this);
+                  content.setOrientation(LinearLayout.VERTICAL);
+                  content.setPadding(dp(18),dp(18),dp(18),dp(24));
+                  scroll.addView(content);
+                  body.addView(scroll);
+
+                  nav = new LinearLayout(this);
+                  nav.setOrientation(LinearLayout.HORIZONTAL);
+                  nav.setGravity(Gravity.CENTER);
+                  nav.setPadding(dp(4),dp(5),dp(4),dp(5));
+                  nav.setBackgroundColor(Color.rgb(11,20,36));
+                  root.addView(nav,new LinearLayout.LayoutParams(-1,dp(66)));
+
+                  setContentView(root);
+
+                  buildNav();
+                  showSettings();
+              }
+
+              void buildNav() {
+                  nav.removeAllViews();
+                  addNav("홈", v -> showHome());
+                  addNav("종목", v -> showStocks());
+                  addNav("AI검색", v -> showAI());
+                  addNav("관심", v -> showFavorites());
+                  addNav("설정", v -> showSettings());
+              }
+
+              void addNav(String label, View.OnClickListener click) {
+                  Button b = new Button(this);
+                  b.setText(label);
+                  b.setTextSize(12);
+                  b.setTextColor(TEXT);
+                  b.setAllCaps(false);
+                  b.setBackgroundColor(Color.TRANSPARENT);
+                  b.setOnClickListener(click);
+                  nav.addView(b,new LinearLayout.LayoutParams(0,-1,1));
+              }
+
+              void clear(String title, String subtitle) {
+                  content.removeAllViews();
+                  content.addView(text(title,26,TEXT,true));
+                  if (subtitle != null) content.addView(text(subtitle,13,MUTED,false));
+                  Space s = new Space(this);
+                  content.addView(s,new LinearLayout.LayoutParams(1,dp(10)));
+              }
+
+              void showHome() {
+                  clear("Marcus AI SWING","주문 기능 없는 AI 증권 분석 앱 · v0.2.1");
+
+                  LinearLayout market = card();
+                  market.addView(text("시장",15,MUTED,false));
+                  market.addView(text("KOSPI · KOSDAQ",20,TEXT,true));
+                  market.addView(text("실제 데이터 API 연결 대기",13,BLUE,false));
+                  content.addView(market);
+
+                  content.addView(text("🔥 오늘의 AI 후보",19,TEXT,true));
+                  addHomeCandidate(stocks[2],"🚀 돌파예비");
+                  addHomeCandidate(stocks[4],"🛡 지지형");
+                  addHomeCandidate(stocks[3],"⚡ Explosion");
+              }
+
+              void addHomeCandidate(String[] s, String signal) {
+                  LinearLayout c = card();
+                  c.addView(text(signal,13,BLUE,true));
+                  c.addView(text(s[0],18,TEXT,true));
+                  c.addView(text(
+                      s[3] + "   " + s[4] + "   AI " + s[5] + "점",
+                      14,
+                      s[4].startsWith("-") ? RED : GREEN,
+                      false
+                  ));
+                  c.setOnClickListener(v -> showDetail(s));
+                  content.addView(c);
+              }
+
+              void showStocks() {
+                  clear("전체 종목","KOSPI · KOSDAQ 통합검색");
+
+                  EditText search = new EditText(this);
+                  search.setHint("종목명 또는 종목코드 검색");
+                  search.setHintTextColor(MUTED);
+                  search.setTextColor(TEXT);
+                  search.setSingleLine(true);
+                  search.setPadding(dp(14),dp(12),dp(14),dp(12));
+                  search.setBackground(bg(PANEL2,14));
+                  content.addView(search,new LinearLayout.LayoutParams(-1,dp(54)));
+
+                  LinearLayout list = new LinearLayout(this);
+                  list.setOrientation(LinearLayout.VERTICAL);
+                  LinearLayout.LayoutParams listLP = new LinearLayout.LayoutParams(-1,-2);
+                  listLP.setMargins(0,dp(14),0,0);
+                  content.addView(list,listLP);
+
+                  renderStocks(list,"");
+
+                  search.addTextChangedListener(new TextWatcher() {
+                      public void beforeTextChanged(CharSequence s,int start,int count,int after) {}
+                      public void onTextChanged(CharSequence s,int start,int before,int count) {
+                          renderStocks(list,s.toString());
+                      }
+                      public void afterTextChanged(Editable e) {}
+                  });
+              }
+
+              void renderStocks(LinearLayout list, String query) {
+                  list.removeAllViews();
+                  String q = query.trim().toLowerCase();
+
+                  for (String[] s : stocks) {
+                      if (q.length() == 0 ||
+                          s[0].toLowerCase().contains(q) ||
+                          s[1].contains(q)) {
+
+                          LinearLayout c = card();
+                          c.addView(text(s[0] + "   " + s[3],17,TEXT,true));
+                          c.addView(text(
+                              s[1] + " · " + s[2] + "   " + s[4],
+                              12,
+                              s[4].startsWith("-") ? RED : GREEN,
+                              false
+                          ));
+                          c.setOnClickListener(v -> showDetail(s));
+                          list.addView(c);
+                      }
+                  }
+              }
+
+              void showDetail(String[] s) {
+                  clear(s[0],s[1] + " · " + s[2]);
+
+                  LinearLayout price = card();
+                  price.addView(text(s[3],29,TEXT,true));
+                  price.addView(text(
+                      s[4],
+                      17,
+                      s[4].startsWith("-") ? RED : GREEN,
+                      true
+                  ));
+                  content.addView(price);
+
+                  Button fav = new Button(this);
+                  updateFavButton(fav,s);
+                  fav.setOnClickListener(v -> {
+                      if (favorites.contains(s[1])) favorites.remove(s[1]);
+                      else favorites.add(s[1]);
+                      updateFavButton(fav,s);
+                  });
+                  content.addView(fav);
+
+                  LinearLayout chart = card();
+                  chart.setMinimumHeight(dp(230));
+                  chart.addView(text("📈 차트",18,TEXT,true));
+                  TextView placeholder = text(
+                      "다음 단계에서\n일봉 · 거래량 · MA5/10/20/60\nBOS · Discount · 지지/저항\n사다/팔다 신호를 표시합니다.",
+                      15,MUTED,false
+                  );
+                  placeholder.setGravity(Gravity.CENTER);
+                  chart.addView(placeholder,new LinearLayout.LayoutParams(-1,dp(170)));
+                  content.addView(chart);
+
+                  LinearLayout ai = card();
+                  ai.addView(text("AI SWING",18,TEXT,true));
+                  ai.addView(text("종합 점수    " + s[5],15,BLUE,true));
+                  ai.addView(text("Explosion     85",14,TEXT,false));
+                  ai.addView(text("BOS           근접",14,TEXT,false));
+                  ai.addView(text("Discount      관찰",14,TEXT,false));
+                  ai.addView(text("구조          정상",14,TEXT,false));
+                  content.addView(ai);
+              }
+
+              void updateFavButton(Button b, String[] s) {
+                  b.setText(favorites.contains(s[1]) ? "★ 관심종목 해제" : "☆ 관심종목 추가");
+                  b.setAllCaps(false);
+              }
+
+              void showAI() {
+                  clear("AI 검색","AI SWING Scanner");
+                  LinearLayout c = card();
+                  c.addView(text("샘플 분석 화면",18,GREEN,true));
+                  c.addView(text("실제 전종목 스캔은 데이터 API 연결 후 활성화",14,MUTED,false));
+                  content.addView(c);
+              }
+
+              void showFavorites() {
+                  clear("관심종목","등록한 종목을 계속 추적합니다");
+
+                  if (favorites.size() == 0) {
+                      LinearLayout empty = card();
+                      empty.addView(text("아직 관심종목이 없습니다.",17,TEXT,true));
+                      empty.addView(text("종목 화면에서 ☆ 버튼으로 추가하세요.",13,MUTED,false));
+                      content.addView(empty);
+                      return;
+                  }
+
+                  for (String[] s : stocks) {
+                      if (favorites.contains(s[1])) {
+                          LinearLayout c = card();
+                          c.addView(text("★ " + s[0],17,TEXT,true));
+                          c.addView(text(
+                              s[3] + "   " + s[4] + "   AI " + s[5] + "점",
+                              13,BLUE,false
+                          ));
+                          c.setOnClickListener(v -> showDetail(s));
+                          content.addView(c);
+                      }
+                  }
+              }
+
+              void showSettings() {
+                  clear("설정","Marcus AI SWING v0.2.1");
+
+                  LinearLayout api = card();
+                  api.addView(text("키움 REST API",20,TEXT,true));
+                  api.addView(text("키를 받으면 이 화면에서 바로 입력하세요.",13,MUTED,false));
+
+                  api.addView(text("환경",13,MUTED,true));
+
+                  Spinner env = new Spinner(this);
+                  String[] modes = {"모의투자","실전투자"};
+                  ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                      this,
+                      android.R.layout.simple_spinner_dropdown_item,
+                      modes
+                  );
+                  env.setAdapter(adapter);
+
+                  String savedEnv = prefs.getString(KEY_ENV,"모의투자");
+                  env.setSelection(savedEnv.equals("실전투자") ? 1 : 0);
+                  api.addView(env);
+
+                  api.addView(text("App Key",13,MUTED,true));
+                  EditText appKey = input("App Key 입력");
+                  api.addView(appKey);
+
+                  api.addView(text("App Secret",13,MUTED,true));
+                  EditText appSecret = input("App Secret 입력");
+                  api.addView(appSecret);
+
+                  String oldKey = prefs.getString(KEY_APPKEY,"");
+                  String oldSecret = prefs.getString(KEY_SECRET,"");
+
+                  if (!oldKey.isEmpty()) appKey.setHint("저장됨 · 새 값 입력 시 교체");
+                  if (!oldSecret.isEmpty()) appSecret.setHint("저장됨 · 새 값 입력 시 교체");
+
+                  LinearLayout buttons = new LinearLayout(this);
+                  buttons.setOrientation(LinearLayout.HORIZONTAL);
+
+                  Button save = new Button(this);
+                  save.setText("저장");
+                  save.setAllCaps(false);
+
+                  Button delete = new Button(this);
+                  delete.setText("삭제");
+                  delete.setAllCaps(false);
+
+                  buttons.addView(save,new LinearLayout.LayoutParams(0,dp(52),1));
+                  buttons.addView(delete,new LinearLayout.LayoutParams(0,dp(52),1));
+                  api.addView(buttons);
+
+                  TextView status = text("",14,MUTED,true);
+                  api.addView(status);
+
+                  Runnable refreshStatus = () -> {
+                      String k = prefs.getString(KEY_APPKEY,"");
+                      String s = prefs.getString(KEY_SECRET,"");
+                      String m = prefs.getString(KEY_ENV,"모의투자");
+
+                      if (!k.isEmpty() && !s.isEmpty()) {
+                          status.setText(
+                              "🟢 저장 완료 · " + m +
+                              "\nApp Key: " + mask(k) +
+                              "\nSecret: " + mask(s)
+                          );
+                          status.setTextColor(GREEN);
+                      } else {
+                          status.setText("🟡 아직 API 키가 저장되지 않았습니다.");
+                          status.setTextColor(MUTED);
+                      }
+                  };
+
+                  save.setOnClickListener(v -> {
+                      String newKey = appKey.getText().toString().trim();
+                      String newSecret = appSecret.getText().toString().trim();
+                      String selectedEnv = env.getSelectedItem().toString();
+
+                      SharedPreferences.Editor editor = prefs.edit();
+                      editor.putString(KEY_ENV, selectedEnv);
+
+                      if (!newKey.isEmpty()) editor.putString(KEY_APPKEY,newKey);
+                      if (!newSecret.isEmpty()) editor.putString(KEY_SECRET,newSecret);
+
+                      editor.apply();
+
+                      appKey.setText("");
+                      appSecret.setText("");
+
+                      Toast.makeText(
+                          this,
+                          "키움 API 설정을 저장했습니다.",
+                          Toast.LENGTH_SHORT
+                      ).show();
+
+                      refreshStatus.run();
+                  });
+
+                  delete.setOnClickListener(v -> {
+                      prefs.edit()
+                          .remove(KEY_APPKEY)
+                          .remove(KEY_SECRET)
+                          .apply();
+
+                      appKey.setText("");
+                      appSecret.setText("");
+
+                      Toast.makeText(
+                          this,
+                          "저장된 API 키를 삭제했습니다.",
+                          Toast.LENGTH_SHORT
+                      ).show();
+
+                      refreshStatus.run();
+                  });
+
+                  refreshStatus.run();
+                  content.addView(api);
+
+                  LinearLayout info = card();
+                  info.addView(text("현재 단계",17,TEXT,true));
+                  info.addView(text("① 키 입력/저장  ✅",14,GREEN,false));
+                  info.addView(text("② 키움 인증 연결 테스트  다음",14,MUTED,false));
+                  info.addView(text("③ 토큰 자동 발급/갱신  다음",14,MUTED,false));
+                  info.addView(text("④ 시세/전종목/차트 연결  이후",14,MUTED,false));
+                  content.addView(info);
+
+                  LinearLayout warning = card();
+                  warning.addView(text("보안",17,TEXT,true));
+                  warning.addView(text(
+                      "App Key와 Secret은 채팅이나 캡처에 노출하지 마세요. " +
+                      "현재 버전은 개인용 테스트로 휴대폰 앱 내부에만 저장합니다.",
+                      13,MUTED,false
+                  ));
+                  content.addView(warning);
+              }
+
+              String mask(String value) {
+                  if (value == null || value.length() == 0) return "미설정";
+                  if (value.length() <= 8) return "••••••••";
+                  return value.substring(0,4)
+                      + "••••••"
+                      + value.substring(value.length()-4);
+              }
+          }
+          JAVA
+
+      - name: Build APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Marcus-AI-SWING-v0.2.1-API-Settings
+          path: app/build/outputs/apk/debug/app-debug.apk
