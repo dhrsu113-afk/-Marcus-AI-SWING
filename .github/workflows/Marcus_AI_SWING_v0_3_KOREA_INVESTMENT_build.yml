@@ -1,0 +1,834 @@
+name: Marcus AI SWING v0.3 Korea Investment Connect
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2'
+
+      - name: Create Android project
+        run: |
+          mkdir -p app/src/main/java/com/marcus/aiswing
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "MarcusAISwing"
+          include(":app")
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.2.2' apply false
+          }
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.marcus.aiswing'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.marcus.aiswing"
+                  minSdk 26
+                  targetSdk 34
+                  versionCode 7
+                  versionName "0.3"
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+
+              <application
+                  android:label="Marcus AI SWING"
+                  android:usesCleartextTraffic="false"
+                  android:theme="@style/AppTheme">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:statusBarColor">#07101F</item>
+                  <item name="android:navigationBarColor">#07101F</item>
+                  <item name="android:colorAccent">#7EA7FF</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/java/com/marcus/aiswing/MainActivity.java <<'JAVA'
+          package com.marcus.aiswing;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.text.InputType;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.widget.*;
+
+          import org.json.JSONObject;
+
+          import java.io.BufferedReader;
+          import java.io.InputStream;
+          import java.io.InputStreamReader;
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.net.URLEncoder;
+          import java.nio.charset.StandardCharsets;
+
+          public class MainActivity extends Activity {
+
+              final int BG=Color.rgb(7,16,31);
+              final int PANEL=Color.rgb(17,28,48);
+              final int PANEL2=Color.rgb(24,38,63);
+              final int TEXT=Color.rgb(239,244,255);
+              final int MUTED=Color.rgb(151,166,195);
+              final int BLUE=Color.rgb(126,167,255);
+              final int GREEN=Color.rgb(103,220,157);
+              final int RED=Color.rgb(255,116,116);
+              final int YELLOW=Color.rgb(255,211,105);
+
+              LinearLayout content;
+              LinearLayout nav;
+              SharedPreferences prefs;
+
+              static final String PREFS="marcus_kis_v03";
+              static final String ENV="kis_env";
+              static final String REAL="실전투자";
+              static final String MOCK="모의투자";
+
+              static final String REAL_KEY="kis_real_key";
+              static final String REAL_SECRET="kis_real_secret";
+              static final String REAL_TOKEN="kis_real_token";
+              static final String REAL_EXPIRES="kis_real_expires";
+
+              static final String MOCK_KEY="kis_mock_key";
+              static final String MOCK_SECRET="kis_mock_secret";
+              static final String MOCK_TOKEN="kis_mock_token";
+              static final String MOCK_EXPIRES="kis_mock_expires";
+
+              int dp(int v){
+                  return (int)(v*getResources().getDisplayMetrics().density+0.5f);
+              }
+
+              TextView text(String s,int size,int color,boolean bold){
+                  TextView t=new TextView(this);
+                  t.setText(s);
+                  t.setTextSize(size);
+                  t.setTextColor(color);
+                  t.setPadding(0,dp(5),0,dp(5));
+                  if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+                  return t;
+              }
+
+              GradientDrawable bg(int color,int radius){
+                  GradientDrawable g=new GradientDrawable();
+                  g.setColor(color);
+                  g.setCornerRadius(dp(radius));
+                  return g;
+              }
+
+              LinearLayout card(){
+                  LinearLayout c=new LinearLayout(this);
+                  c.setOrientation(LinearLayout.VERTICAL);
+                  c.setPadding(dp(16),dp(14),dp(16),dp(14));
+                  c.setBackground(bg(PANEL,16));
+                  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+                  lp.setMargins(0,0,0,dp(12));
+                  c.setLayoutParams(lp);
+                  return c;
+              }
+
+              EditText input(String hint){
+                  EditText e=new EditText(this);
+                  e.setHint(hint);
+                  e.setHintTextColor(MUTED);
+                  e.setTextColor(TEXT);
+                  e.setSingleLine(true);
+                  e.setPadding(dp(14),dp(11),dp(14),dp(11));
+                  e.setBackground(bg(PANEL2,12));
+                  e.setInputType(
+                      InputType.TYPE_CLASS_TEXT |
+                      InputType.TYPE_TEXT_VARIATION_PASSWORD
+                  );
+                  return e;
+              }
+
+              Button button(String s){
+                  Button b=new Button(this);
+                  b.setText(s);
+                  b.setAllCaps(false);
+                  return b;
+              }
+
+              @Override
+              protected void onCreate(Bundle b){
+                  super.onCreate(b);
+
+                  prefs=getSharedPreferences(PREFS,MODE_PRIVATE);
+
+                  LinearLayout root=new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setBackgroundColor(BG);
+
+                  ScrollView scroll=new ScrollView(this);
+                  content=new LinearLayout(this);
+                  content.setOrientation(LinearLayout.VERTICAL);
+                  content.setPadding(dp(18),dp(18),dp(18),dp(24));
+                  scroll.addView(content);
+                  root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+
+                  nav=new LinearLayout(this);
+                  nav.setOrientation(LinearLayout.HORIZONTAL);
+                  nav.setGravity(Gravity.CENTER);
+                  nav.setBackgroundColor(Color.rgb(11,20,36));
+                  root.addView(nav,new LinearLayout.LayoutParams(-1,dp(66)));
+
+                  setContentView(root);
+
+                  addNav("홈",v->showHome());
+                  addNav("종목",v->showStocks());
+                  addNav("AI검색",v->showAI());
+                  addNav("관심",v->showFavorites());
+                  addNav("설정",v->showSettings());
+
+                  showHome();
+              }
+
+              void addNav(String s,View.OnClickListener l){
+                  Button b=new Button(this);
+                  b.setText(s);
+                  b.setTextSize(12);
+                  b.setTextColor(TEXT);
+                  b.setAllCaps(false);
+                  b.setBackgroundColor(Color.TRANSPARENT);
+                  b.setOnClickListener(l);
+                  nav.addView(b,new LinearLayout.LayoutParams(0,-1,1));
+              }
+
+              void clear(String title,String sub){
+                  content.removeAllViews();
+                  content.addView(text(title,26,TEXT,true));
+                  if(sub!=null)content.addView(text(sub,13,MUTED,false));
+                  Space sp=new Space(this);
+                  content.addView(sp,new LinearLayout.LayoutParams(1,dp(10)));
+              }
+
+              String activeEnv(){
+                  return prefs.getString(ENV,REAL);
+              }
+
+              boolean isReal(String env){
+                  return REAL.equals(env);
+              }
+
+              String baseUrl(String env){
+                  return isReal(env)
+                      ? "https://openapi.koreainvestment.com:9443"
+                      : "https://openapivts.koreainvestment.com:29443";
+              }
+
+              String keyName(String env){ return isReal(env)?REAL_KEY:MOCK_KEY; }
+              String secretName(String env){ return isReal(env)?REAL_SECRET:MOCK_SECRET; }
+              String tokenName(String env){ return isReal(env)?REAL_TOKEN:MOCK_TOKEN; }
+              String expiresName(String env){ return isReal(env)?REAL_EXPIRES:MOCK_EXPIRES; }
+
+              boolean credentialsReady(String env){
+                  return !prefs.getString(keyName(env),"").isEmpty()
+                      && !prefs.getString(secretName(env),"").isEmpty();
+              }
+
+              boolean tokenReady(String env){
+                  return !prefs.getString(tokenName(env),"").isEmpty();
+              }
+
+              void showHome(){
+                  clear("Marcus AI SWING","한국투자증권 Open API 연결 버전 · v0.3");
+
+                  LinearLayout c=card();
+                  c.addView(text("한국투자 API 상태",18,TEXT,true));
+                  addStatus(c,REAL);
+                  addStatus(c,MOCK);
+                  content.addView(c);
+
+                  LinearLayout n=card();
+                  n.addView(text("이번 검증 목표",18,TEXT,true));
+                  n.addView(text("① App Key / Secret 저장",14,TEXT,false));
+                  n.addView(text("② OAuth 접근토큰 발급",14,TEXT,false));
+                  n.addView(text("③ 삼성전자(005930) 실제 현재가 조회",14,TEXT,false));
+                  n.addView(text("④ 성공 후 전종목·차트·AI 검색기 연결",14,BLUE,true));
+                  content.addView(n);
+              }
+
+              void addStatus(LinearLayout c,String env){
+                  String state;
+                  if(tokenReady(env))state="🟢 연결 완료";
+                  else if(credentialsReady(env))state="🟡 키 저장됨 / 인증 전";
+                  else state="⚪ 미설정";
+
+                  c.addView(text(
+                      env+" · "+state+(env.equals(activeEnv())?" · ⭐ 사용중":""),
+                      14,
+                      tokenReady(env)?GREEN:(credentialsReady(env)?YELLOW:MUTED),
+                      true
+                  ));
+              }
+
+              void showSettings(){
+                  clear("설정","한국투자증권 KIS Developers");
+
+                  content.addView(buildAccountCard(REAL));
+                  content.addView(buildAccountCard(MOCK));
+
+                  LinearLayout info=card();
+                  info.addView(text("연결 서버",17,TEXT,true));
+                  info.addView(text("실전: https://openapi.koreainvestment.com:9443",12,BLUE,false));
+                  info.addView(text("모의: https://openapivts.koreainvestment.com:29443",12,BLUE,false));
+                  info.addView(text(
+                      "한투에서 받은 실전 키와 모의 키를 각각 해당 카드에만 입력하세요.",
+                      13,YELLOW,false
+                  ));
+                  content.addView(info);
+              }
+
+              LinearLayout buildAccountCard(String env){
+                  LinearLayout c=card();
+
+                  c.addView(text((isReal(env)?"🔴 ":"🔵 ")+env,20,TEXT,true));
+                  c.addView(text("서버: "+baseUrl(env),12,BLUE,false));
+
+                  EditText key=input(env+" App Key");
+                  EditText secret=input(env+" App Secret");
+
+                  if(!prefs.getString(keyName(env),"").isEmpty()){
+                      key.setHint("저장됨 · 새 값 입력 시 교체");
+                  }
+                  if(!prefs.getString(secretName(env),"").isEmpty()){
+                      secret.setHint("저장됨 · 새 값 입력 시 교체");
+                  }
+
+                  c.addView(text("App Key",13,MUTED,true));
+                  c.addView(key);
+                  c.addView(text("App Secret",13,MUTED,true));
+                  c.addView(secret);
+
+                  Button save=button(env+" 키 저장");
+                  Button test=button(env+" OAuth 연결 테스트");
+                  Button use=button(env+"을 데이터 환경으로 사용");
+                  Button delete=button(env+" 저장정보 삭제");
+
+                  ProgressBar pb=new ProgressBar(this);
+                  pb.setVisibility(View.GONE);
+                  TextView status=text("",14,MUTED,true);
+
+                  c.addView(save);
+                  c.addView(test);
+                  c.addView(use);
+                  c.addView(delete);
+                  c.addView(pb);
+                  c.addView(status);
+
+                  Runnable refresh=()->{
+                      String k=prefs.getString(keyName(env),"");
+                      String s=prefs.getString(secretName(env),"");
+
+                      StringBuilder sb=new StringBuilder();
+
+                      if(!k.isEmpty()&&!s.isEmpty()){
+                          sb.append("🟢 Key/Secret 저장됨\n");
+                          sb.append("App Key: ").append(mask(k)).append("\n");
+                          sb.append("Secret: ").append(mask(s)).append("\n");
+                      }else{
+                          sb.append("⚪ Key/Secret 미설정\n");
+                      }
+
+                      if(tokenReady(env)){
+                          sb.append("🟢 OAuth 토큰 있음\n");
+                          sb.append("만료: ").append(prefs.getString(expiresName(env),"-"));
+                          status.setTextColor(GREEN);
+                      }else{
+                          status.setTextColor(credentialsReady(env)?YELLOW:MUTED);
+                      }
+
+                      if(env.equals(activeEnv())){
+                          sb.append("\n⭐ 현재 데이터 환경");
+                      }
+
+                      status.setText(sb.toString());
+                  };
+
+                  save.setOnClickListener(v->{
+                      String k=key.getText().toString().trim();
+                      String s=secret.getText().toString().trim();
+
+                      SharedPreferences.Editor ed=prefs.edit();
+
+                      if(!k.isEmpty())ed.putString(keyName(env),k);
+                      if(!s.isEmpty())ed.putString(secretName(env),s);
+
+                      if(!k.isEmpty()||!s.isEmpty()){
+                          ed.remove(tokenName(env));
+                          ed.remove(expiresName(env));
+                      }
+
+                      ed.apply();
+
+                      key.setText("");
+                      secret.setText("");
+
+                      Toast.makeText(this,env+" 키 저장 완료",Toast.LENGTH_SHORT).show();
+                      refresh.run();
+                  });
+
+                  test.setOnClickListener(v->{
+                      String k=prefs.getString(keyName(env),"");
+                      String s=prefs.getString(secretName(env),"");
+
+                      if(k.isEmpty()||s.isEmpty()){
+                          status.setText("🔴 App Key / Secret을 먼저 저장하세요.");
+                          status.setTextColor(RED);
+                          return;
+                      }
+
+                      pb.setVisibility(View.VISIBLE);
+                      test.setEnabled(false);
+                      status.setText(env+" OAuth 토큰 요청 중...");
+                      status.setTextColor(BLUE);
+
+                      new Thread(()->{
+                          try{
+                              JSONObject r=requestToken(env,k,s);
+
+                              String token=r.optString("access_token","");
+                              String expires=r.optString("access_token_token_expired","");
+
+                              if(!token.isEmpty()){
+                                  prefs.edit()
+                                      .putString(tokenName(env),token)
+                                      .putString(expiresName(env),expires)
+                                      .putString(ENV,env)
+                                      .apply();
+
+                                  runOnUiThread(()->{
+                                      pb.setVisibility(View.GONE);
+                                      test.setEnabled(true);
+                                      status.setText(
+                                          "🟢 "+env+" OAuth 연결 성공\n"+
+                                          "접근토큰 발급 완료\n"+
+                                          "만료: "+expires+
+                                          "\n⭐ 현재 데이터 환경으로 자동 선택됨"
+                                      );
+                                      status.setTextColor(GREEN);
+                                  });
+
+                              }else{
+                                  String msg=r.optString(
+                                      "error_description",
+                                      r.optString("msg1",r.toString())
+                                  );
+
+                                  runOnUiThread(()->{
+                                      pb.setVisibility(View.GONE);
+                                      test.setEnabled(true);
+                                      status.setText("🔴 "+env+" 인증 실패\n"+msg);
+                                      status.setTextColor(RED);
+                                  });
+                              }
+
+                          }catch(Exception e){
+                              runOnUiThread(()->{
+                                  pb.setVisibility(View.GONE);
+                                  test.setEnabled(true);
+                                  status.setText("🔴 "+env+" 연결 실패\n"+safeError(e));
+                                  status.setTextColor(RED);
+                              });
+                          }
+                      }).start();
+                  });
+
+                  use.setOnClickListener(v->{
+                      if(!tokenReady(env)){
+                          Toast.makeText(
+                              this,
+                              env+" OAuth 연결 테스트를 먼저 성공시켜주세요.",
+                              Toast.LENGTH_SHORT
+                          ).show();
+                          return;
+                      }
+
+                      prefs.edit().putString(ENV,env).apply();
+                      Toast.makeText(this,env+"을 데이터 환경으로 선택했습니다.",Toast.LENGTH_SHORT).show();
+                      refresh.run();
+                  });
+
+                  delete.setOnClickListener(v->{
+                      prefs.edit()
+                          .remove(keyName(env))
+                          .remove(secretName(env))
+                          .remove(tokenName(env))
+                          .remove(expiresName(env))
+                          .apply();
+
+                      key.setText("");
+                      secret.setText("");
+
+                      Toast.makeText(this,env+" 저장정보 삭제 완료",Toast.LENGTH_SHORT).show();
+                      refresh.run();
+                  });
+
+                  refresh.run();
+                  return c;
+              }
+
+              JSONObject requestToken(String env,String appKey,String appSecret)throws Exception{
+                  JSONObject body=new JSONObject();
+                  body.put("grant_type","client_credentials");
+                  body.put("appkey",appKey);
+                  body.put("appsecret",appSecret);
+
+                  HttpResult result=postJson(
+                      baseUrl(env)+"/oauth2/tokenP",
+                      body.toString()
+                  );
+
+                  if(result.body==null||result.body.trim().isEmpty()){
+                      throw new Exception("토큰 응답이 비어 있습니다. HTTP "+result.code);
+                  }
+
+                  return new JSONObject(result.body);
+              }
+
+              void showStocks(){
+                  clear("종목","한국투자 실제 현재가 연결 테스트");
+
+                  String env=activeEnv();
+
+                  LinearLayout c=card();
+                  c.addView(text("현재 환경: "+env,17,BLUE,true));
+
+                  EditText code=new EditText(this);
+                  code.setText("005930");
+                  code.setSingleLine(true);
+                  code.setTextColor(TEXT);
+                  code.setHintTextColor(MUTED);
+                  code.setBackground(bg(PANEL2,12));
+                  code.setPadding(dp(14),dp(11),dp(14),dp(11));
+
+                  Button quote=button("현재가 조회");
+                  ProgressBar pb=new ProgressBar(this);
+                  pb.setVisibility(View.GONE);
+                  TextView result=text("",15,MUTED,false);
+
+                  c.addView(text("종목코드",13,MUTED,true));
+                  c.addView(code);
+                  c.addView(quote);
+                  c.addView(pb);
+                  c.addView(result);
+                  content.addView(c);
+
+                  quote.setOnClickListener(v->{
+                      String selected=activeEnv();
+
+                      if(!tokenReady(selected)){
+                          result.setText(
+                              "🔴 설정에서 "+selected+
+                              " OAuth 연결 테스트를 먼저 성공시켜주세요."
+                          );
+                          result.setTextColor(RED);
+                          return;
+                      }
+
+                      String stockCode=code.getText().toString().trim();
+
+                      if(stockCode.isEmpty()){
+                          result.setText("종목코드를 입력하세요.");
+                          result.setTextColor(RED);
+                          return;
+                      }
+
+                      pb.setVisibility(View.VISIBLE);
+                      quote.setEnabled(false);
+                      result.setText("한국투자 현재가 조회 중...");
+                      result.setTextColor(BLUE);
+
+                      new Thread(()->{
+                          try{
+                              JSONObject json=requestQuote(selected,stockCode);
+                              String rt=json.optString("rt_cd","");
+
+                              if("0".equals(rt)){
+                                  JSONObject o=json.optJSONObject("output");
+                                  if(o==null)throw new Exception("응답에 output이 없습니다.");
+
+                                  String price=o.optString("stck_prpr","-");
+                                  String change=o.optString("prdy_vrss","-");
+                                  String rate=o.optString("prdy_ctrt","-");
+                                  String volume=o.optString("acml_vol","-");
+                                  String high=o.optString("stck_hgpr","-");
+                                  String low=o.optString("stck_lwpr","-");
+
+                                  runOnUiThread(()->{
+                                      pb.setVisibility(View.GONE);
+                                      quote.setEnabled(true);
+                                      result.setText(
+                                          "🟢 실제 시세 조회 성공\n"+
+                                          "종목코드: "+stockCode+"\n"+
+                                          "현재가: "+price+"원\n"+
+                                          "전일대비: "+change+" ("+rate+"%)\n"+
+                                          "거래량: "+volume+"\n"+
+                                          "고가: "+high+" / 저가: "+low
+                                      );
+                                      result.setTextColor(GREEN);
+                                  });
+
+                              }else{
+                                  String msg=json.optString("msg1",json.toString());
+
+                                  runOnUiThread(()->{
+                                      pb.setVisibility(View.GONE);
+                                      quote.setEnabled(true);
+                                      result.setText("🔴 시세 조회 실패\n"+msg);
+                                      result.setTextColor(RED);
+                                  });
+                              }
+
+                          }catch(Exception e){
+                              runOnUiThread(()->{
+                                  pb.setVisibility(View.GONE);
+                                  quote.setEnabled(true);
+                                  result.setText("🔴 시세 조회 실패\n"+safeError(e));
+                                  result.setTextColor(RED);
+                              });
+                          }
+                      }).start();
+                  });
+              }
+
+              JSONObject requestQuote(String env,String stockCode)throws Exception{
+                  String url=
+                      baseUrl(env)+
+                      "/uapi/domestic-stock/v1/quotations/inquire-price"+
+                      "?FID_COND_MRKT_DIV_CODE=J"+
+                      "&FID_INPUT_ISCD="+
+                      URLEncoder.encode(stockCode,StandardCharsets.UTF_8.name());
+
+                  HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();
+
+                  try{
+                      c.setRequestMethod("GET");
+                      c.setConnectTimeout(15000);
+                      c.setReadTimeout(20000);
+
+                      c.setRequestProperty(
+                          "authorization",
+                          "Bearer "+prefs.getString(tokenName(env),"")
+                      );
+                      c.setRequestProperty(
+                          "appkey",
+                          prefs.getString(keyName(env),"")
+                      );
+                      c.setRequestProperty(
+                          "appsecret",
+                          prefs.getString(secretName(env),"")
+                      );
+                      c.setRequestProperty(
+                          "tr_id",
+                          "FHKST01010100"
+                      );
+                      c.setRequestProperty(
+                          "Content-Type",
+                          "application/json; charset=utf-8"
+                      );
+
+                      int http=c.getResponseCode();
+
+                      InputStream is=
+                          (http>=200&&http<400)
+                          ? c.getInputStream()
+                          : c.getErrorStream();
+
+                      String body=readAll(is);
+
+                      if(body==null||body.trim().isEmpty()){
+                          throw new Exception("시세 응답이 비어 있습니다. HTTP "+http);
+                      }
+
+                      return new JSONObject(body);
+
+                  }finally{
+                      c.disconnect();
+                  }
+              }
+
+              void showAI(){
+                  clear("AI 검색","AI SWING Scanner");
+
+                  LinearLayout c=card();
+                  c.addView(text("한투 시세 연결 성공 후 다음 단계",18,TEXT,true));
+                  c.addView(text(
+                      "전종목 → 일봉 OHLCV → Explosion → BOS → Discount → TOP20",
+                      14,BLUE,false
+                  ));
+                  content.addView(c);
+              }
+
+              void showFavorites(){
+                  clear("관심종목","관심종목 기능");
+
+                  LinearLayout c=card();
+                  c.addView(text(
+                      "실제 종목 데이터 연결 후 관심종목 편집/영구저장을 붙입니다.",
+                      14,MUTED,false
+                  ));
+                  content.addView(c);
+              }
+
+              static class HttpResult{
+                  int code;
+                  String body;
+
+                  HttpResult(int c,String b){
+                      code=c;
+                      body=b;
+                  }
+              }
+
+              HttpResult postJson(String url,String body)throws Exception{
+                  HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();
+
+                  try{
+                      c.setRequestMethod("POST");
+                      c.setConnectTimeout(15000);
+                      c.setReadTimeout(20000);
+                      c.setDoOutput(true);
+                      c.setRequestProperty(
+                          "Content-Type",
+                          "application/json; charset=utf-8"
+                      );
+
+                      byte[] bytes=body.getBytes(StandardCharsets.UTF_8);
+
+                      try(OutputStream os=c.getOutputStream()){
+                          os.write(bytes);
+                      }
+
+                      int http=c.getResponseCode();
+
+                      InputStream is=
+                          (http>=200&&http<400)
+                          ? c.getInputStream()
+                          : c.getErrorStream();
+
+                      return new HttpResult(http,readAll(is));
+
+                  }finally{
+                      c.disconnect();
+                  }
+              }
+
+              String readAll(InputStream is)throws Exception{
+                  if(is==null)return "";
+
+                  BufferedReader br=
+                      new BufferedReader(
+                          new InputStreamReader(
+                              is,
+                              StandardCharsets.UTF_8
+                          )
+                      );
+
+                  StringBuilder sb=new StringBuilder();
+                  String line;
+
+                  while((line=br.readLine())!=null){
+                      sb.append(line);
+                  }
+
+                  br.close();
+                  return sb.toString();
+              }
+
+              String safeError(Exception e){
+                  String m=e.getMessage();
+                  return (m==null||m.isEmpty())
+                      ? e.getClass().getSimpleName()
+                      : m;
+              }
+
+              String mask(String v){
+                  if(v==null||v.isEmpty())return "미설정";
+                  if(v.length()<=8)return "••••••••";
+                  return v.substring(0,4)+"••••••"+v.substring(v.length()-4);
+              }
+          }
+          JAVA
+
+      - name: Build APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Marcus-AI-SWING-v0.3-KOREA-INVESTMENT
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
